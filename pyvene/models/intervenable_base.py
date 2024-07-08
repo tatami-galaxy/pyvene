@@ -234,17 +234,24 @@ class BaseModel(nn.Module):
         self.disable_model_gradients()
         self.trainable_model_parameters = {}
 
+
     def __str__(self):
         """
         Print out basic info about this intervenable instance
+        Not working!
         """
         attr_dict = {
             "model_type": self.model_type,
-            "intervention_types": self.intervention_types,
+            #"intervention_types": self.config.intervention_types.__name__,
             "alignabls": self.sorted_keys,
             "mode": self.mode,
+            "config": self.config,
+            "representations": self.representations,
+            "interventions": self.interventions,
         }
         return json.dumps(attr_dict, indent=4)
+        #return attr_dict
+
 
     def _get_representation_key(self, representation):
         """
@@ -265,6 +272,7 @@ class BaseModel(nn.Module):
             self._key_collision_counter[key_proposal] += 1
         return f"{key_proposal}#{self._key_collision_counter[key_proposal]}"
     
+
     def get_trainable_parameters(self):
         """
         Return trainable params as key value pairs
@@ -278,6 +286,7 @@ class BaseModel(nn.Module):
                 ret_params += [p]
         return ret_params
     
+
     def named_parameters(self, recurse=True):
         """
         The above, but for HuggingFace.
@@ -291,17 +300,20 @@ class BaseModel(nn.Module):
                 ret_params += [('model.' + n, p)]
         return ret_params
     
+
     def get_cached_activations(self):
         """
         Return the cached activations with keys
         """
         return self.activations
 
+
     def get_cached_hot_activations(self):
         """
         Return the cached hot activations with linked keys
         """
         return self.hot_activations
+
 
     def set_temperature(self, temp: torch.Tensor):
         """
@@ -312,6 +324,7 @@ class BaseModel(nn.Module):
                 isinstance(v[0], SigmoidMaskIntervention):
                 v[0].set_temperature(temp)
 
+
     def enable_model_gradients(self):
         """
         Enable gradient in the model
@@ -321,7 +334,8 @@ class BaseModel(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = True 
         self.model_has_grad = True
-                
+
+
     def disable_model_gradients(self):
         """
         Disable gradient in the model
@@ -331,13 +345,15 @@ class BaseModel(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
         self.model_has_grad = False
-            
+
+
     def disable_intervention_gradients(self):
         """
         Disable gradient in the trainable intervention
         """
         # Freeze all intervention weights
         pass
+
 
     def set_device(self, device, set_model=True):
         """
@@ -348,11 +364,13 @@ class BaseModel(nn.Module):
         if set_model:
             self.model.to(device)
 
+
     def get_device(self):
         """
         Get device of interventions and the model
         """
         return self.model.device
+
 
     def count_parameters(self, include_model=False):
         """
@@ -373,6 +391,7 @@ class BaseModel(nn.Module):
                 p.numel() for p in self.model.parameters() if p.requires_grad)
         return total_parameters
 
+
     def set_zero_grad(self):
         """
         Set device of interventions and the model
@@ -381,6 +400,7 @@ class BaseModel(nn.Module):
             if isinstance(v[0], TrainableIntervention):
                 v[0].zero_grad()
 
+
     def zero_grad(self):
         """
         The above, but for HuggingFace.
@@ -388,6 +408,7 @@ class BaseModel(nn.Module):
         for k, v in self.interventions.items():
             if isinstance(v[0], TrainableIntervention):
                 v[0].zero_grad()
+
 
     def _input_validation(
         self,
@@ -428,6 +449,7 @@ class BaseModel(nn.Module):
                     raise ValueError(
                         f"Stateful models need nested activations. See our documentions."
                     )
+
 
     def _gather_intervention_output(
         self, output, representations_key, unit_locations
@@ -482,6 +504,7 @@ class BaseModel(nn.Module):
 
         return selected_output
 
+
     def _scatter_intervention_output(
         self,
         output,
@@ -525,6 +548,7 @@ class BaseModel(nn.Module):
         
         return original_output
     
+
     def _broadcast_unit_locations(
         self,
         batch_size,
@@ -612,6 +636,7 @@ class BaseModel(nn.Module):
             raise ValueError(f"The mode {self.mode} is not supported.")
         return _unit_locations
     
+
     def _broadcast_source_representations(
         self,
         source_representations
@@ -633,6 +658,7 @@ class BaseModel(nn.Module):
             )
         return _source_representations
             
+
     def _broadcast_sources(
         self,
         sources
@@ -646,6 +672,7 @@ class BaseModel(nn.Module):
             _sources = sources
         return _sources
     
+
     def _broadcast_subspaces(
         self,
         batch_size,
@@ -1087,6 +1114,7 @@ class IntervenableNdifModel(BaseModel):
         raise NotImplementedError("Please Implement this method")
 
 
+
 class IntervenableModel(BaseModel):
     """
     Intervenable model via pyvene native backend (hook-based).
@@ -1095,6 +1123,7 @@ class IntervenableModel(BaseModel):
     
     def __init__(self, config, model, **kwargs):
         super().__init__(config, model, "native", **kwargs)
+
 
     def _reset_hook_count(self):
         """
@@ -1105,11 +1134,13 @@ class IntervenableModel(BaseModel):
         for k, _ in self._intervention_state.items():
             self._intervention_state[k].reset()
 
+
     def _remove_forward_hooks(self):
         """
         Clean up all the remaining hooks before any call
         """
         remove_forward_hooks(self.model)
+
 
     def _cleanup_states(self, skip_activation_gc=False):
         """
@@ -1127,6 +1158,7 @@ class IntervenableModel(BaseModel):
             self.hot_activations = {}
             self._batched_setter_activation_select = {}
     
+
     def save(
         self, save_directory, save_to_hf_hub=False, hf_repo_name="my-awesome-model"
     ):
@@ -1224,6 +1256,7 @@ class IntervenableModel(BaseModel):
                 repo_type="model",
             )
 
+
     @staticmethod
     def load(load_directory, model, local_directory=None, from_huggingface_hub=False):
         """
@@ -1281,6 +1314,7 @@ class IntervenableModel(BaseModel):
 
         return intervenable
 
+
     def save_intervention(self, save_directory, include_model=True):
         """
         Instead of saving the metadata with artifacts, it only saves artifacts such as
@@ -1306,6 +1340,7 @@ class IntervenableModel(BaseModel):
                     model_state_dict[n] = p
             torch.save(model_state_dict, os.path.join(save_directory, model_binary_filename))
     
+
     def load_intervention(self, load_directory, include_model=True):
         """
         Instead of creating an new object, this function loads existing weights onto
@@ -1324,6 +1359,7 @@ class IntervenableModel(BaseModel):
             model_binary_filename = "pytorch_model.bin"
             saved_model_state_dict = torch.load(os.path.join(load_directory, model_binary_filename))
             self.model.load_state_dict(saved_model_state_dict, strict=False)
+
 
     def _intervention_getter(
         self,
@@ -1392,6 +1428,7 @@ class IntervenableModel(BaseModel):
 
         return HandlerList(handlers)
 
+
     def _tidy_stateful_activations(
         self,
     ):
@@ -1417,6 +1454,7 @@ class IntervenableModel(BaseModel):
                     ):
                         self._tidify_activations[index].append(activation)
                 self.activations[k] = self._tidify_activations
+
 
     def _reconcile_stateful_cached_activations(
         self,
@@ -1466,6 +1504,7 @@ class IntervenableModel(BaseModel):
         # reconciled_activations[~state_select_flag] = intervening_activations[~state_select_flag]
 
         return reconciled_activations
+
 
     def _intervention_setter(
         self,
@@ -1580,6 +1619,7 @@ class IntervenableModel(BaseModel):
 
         return HandlerList(handlers)
 
+
     def _output_validation(
         self,
     ):
@@ -1609,12 +1649,14 @@ class IntervenableModel(BaseModel):
             flatten_input_dict = input_dict
         return flatten_input_dict
 
+
     def _get_partition_size(self, input_dict):
         if not isinstance(input_dict, dict):
             assert isinstance(input_dict, list)
             return len(input_dict)
         else:
             return 1
+
 
     def _wait_for_forward_with_parallel_intervention(
         self,
@@ -1682,6 +1724,7 @@ class IntervenableModel(BaseModel):
                     all_set_handlers.extend(set_handlers)
         return all_set_handlers
 
+
     def _wait_for_forward_with_serial_intervention(
         self,
         sources,
@@ -1748,6 +1791,7 @@ class IntervenableModel(BaseModel):
                     # for setters, we don't remove them.
                     all_set_handlers.extend(set_handlers)
         return all_set_handlers
+
 
     def forward(
         self,
