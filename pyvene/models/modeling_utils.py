@@ -150,6 +150,9 @@ def get_module_hook(model, representation, backend="native") -> nn.Module:
                 int(representation.moe_key),
             )
     else:
+        # CONST_INPUT_HOOK = "register_forward_pre_hook"
+        # CONST_OUTPUT_HOOK = "register_forward_hook"
+        # CONST_GRAD_HOOK = "register_hook"
         parameter_name = ".".join(representation.component.split(".")[:-1])
         if representation.component.split(".")[-1] == "input":
             hook_type = CONST_INPUT_HOOK
@@ -292,9 +295,7 @@ def gather_neurons(tensor_input, unit, unit_locations_as_list, device=None):
 
         return tensor_output  # b, num_unit (h), num_unit (pos), d
     else:
-        unit_locations = torch.tensor(
-            unit_locations_as_list, device="cpu"
-        )
+        unit_locations = torch.tensor(unit_locations_as_list, device=device)    # device="cpu")
 
         tensor_output = torch.gather(
             tensor_input,
@@ -427,6 +428,7 @@ def scatter_neurons(
         else:
             tensor_input[_batch_idx, unit_locations] = replacing_tensor_input
         return tensor_input
+    
     assert False
 
 

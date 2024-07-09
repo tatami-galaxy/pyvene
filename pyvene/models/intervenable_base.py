@@ -149,7 +149,11 @@ class BaseModel(nn.Module):
                 CollectIntervention
             ):
                 self.return_collect_activations = True
-            
+
+            # determine what kind of hooks are needed
+            # CONST_INPUT_HOOK = "register_forward_pre_hook"
+            # CONST_OUTPUT_HOOK = "register_forward_hook"
+            # CONST_GRAD_HOOK = "register_hook"
             module_hook = get_module_hook(
                 model, representation, backend
             )
@@ -457,7 +461,6 @@ class BaseModel(nn.Module):
         """
         Gather intervening activations from the output based on indices
         """
-
         if (
             representations_key in self._intervention_reverse_link
             and self._intervention_reverse_link[representations_key]
@@ -526,13 +529,14 @@ class BaseModel(nn.Module):
             original_output[:] = intervened_representation[:]
             return original_output
         
+        # ex : block_input
         component = self.representations[
             representations_key
         ].component
         unit = self.representations[
             representations_key
         ].unit
-        
+     
         # scatter in-place
         _ = scatter_neurons(
             original_output,
@@ -1361,74 +1365,6 @@ class IntervenableModel(BaseModel):
             self.model.load_state_dict(saved_model_state_dict, strict=False)
 
 
-    def _intervention_getter(
-        self,
-        keys,
-        unit_locations,
-    ) -> HandlerList:
-        """
-        Create a list of getter handlers that will fetch activations
-        """
-        handlers = []
-        for key_i, key in enumerate(keys):
-            intervention, module_hook = self.interventions[key]
-
-            def hook_callback(model, args, kwargs, output=None):
-                if self._is_generation:
-                    pass
-                    # for getter, there is no restriction.
-                    # is_prompt = self._key_getter_call_counter[key] == 0
-                    # if not self._intervene_on_prompt or is_prompt:
-                    #     self._key_getter_call_counter[key] += 1
-                    # if self._intervene_on_prompt ^ is_prompt:
-                    #     return  # no-op
-                if output is None:
-                    if len(args) == 0:  # kwargs based calls
-                        # PR: https://github.com/frankaging/align-transformers/issues/11
-                        # We cannot assume the dict only contain one element
-                        output = kwargs[list(kwargs.keys())[0]]
-                    else:
-                        output = args
-
-                if isinstance(intervention, SkipIntervention):
-                    selected_output = self._gather_intervention_output(
-                        args[0],  # this is actually the input to the module
-                        key,
-                        unit_locations[key_i],
-                    )
-                else:
-                    selected_output = self._gather_intervention_output(
-                        output, key, unit_locations[key_i]
-                    )
-
-                if self.is_model_stateless:
-                    # WARNING: might be worth to check the below assertion at runtime,
-                    # but commenting it out for now just to avoid confusion.
-                    # assert key not in self.activations
-                    self.activations[key] = selected_output
-                else:
-                    state_select_flag = []
-                    for unit_location in unit_locations[key_i]:
-                        if (
-                            self._intervention_state[key].getter_version()
-                            in unit_location
-                        ):
-                            state_select_flag += [True]
-                        else:
-                            state_select_flag += [False]
-                    # for stateful model (e.g., gru), we save extra activations and metadata to do
-                    # stateful interventions.
-                    self.activations.setdefault(key, []).append(
-                        (selected_output, state_select_flag)
-                    )
-                # set version for stateful models
-                self._intervention_state[key].inc_getter_version()
-
-            handlers.append(module_hook(hook_callback, with_kwargs=True))
-
-        return HandlerList(handlers)
-
-
     def _tidy_stateful_activations(
         self,
     ):
@@ -1504,6 +1440,74 @@ class IntervenableModel(BaseModel):
         # reconciled_activations[~state_select_flag] = intervening_activations[~state_select_flag]
 
         return reconciled_activations
+    
+
+    def _intervention_getter(
+        self,
+        keys,
+        unit_locations,
+    ) -> HandlerList:
+        """
+        Create a list of getter handlers that will fetch activations
+        """
+        handlers = []
+        for key_i, key in enumerate(keys):
+            intervention, module_hook = self.interventions[key]
+
+            def hook_callback(model, args, kwargs, output=None):
+                if self._is_generation:
+                    pass
+                    # for getter, there is no restriction.
+                    # is_prompt = self._key_getter_call_counter[key] == 0
+                    # if not self._intervene_on_prompt or is_prompt:
+                    #     self._key_getter_call_counter[key] += 1
+                    # if self._intervene_on_prompt ^ is_prompt:
+                    #     return  # no-op
+                if output is None:
+                    if len(args) == 0:  # kwargs based calls
+                        # PR: https://github.com/frankaging/align-transformers/issues/11
+                        # We cannot assume the dict only contain one element
+                        output = kwargs[list(kwargs.keys())[0]]
+                    else:
+                        output = args
+
+                if isinstance(intervention, SkipIntervention):
+                    selected_output = self._gather_intervention_output(
+                        args[0],  # this is actually the input to the module
+                        key,
+                        unit_locations[key_i],
+                    )
+                else:
+                    selected_output = self._gather_intervention_output(
+                        output, key, unit_locations[key_i]
+                    )
+
+                if self.is_model_stateless:
+                    # WARNING: might be worth to check the below assertion at runtime,
+                    # but commenting it out for now just to avoid confusion.
+                    # assert key not in self.activations
+                    self.activations[key] = selected_output
+                else:
+                    state_select_flag = []
+                    for unit_location in unit_locations[key_i]:
+                        if (
+                            self._intervention_state[key].getter_version()
+                            in unit_location
+                        ):
+                            state_select_flag += [True]
+                        else:
+                            state_select_flag += [False]
+                    # for stateful model (e.g., gru), we save extra activations and metadata to do
+                    # stateful interventions.
+                    self.activations.setdefault(key, []).append(
+                        (selected_output, state_select_flag)
+                    )
+                # set version for stateful models
+                self._intervention_state[key].inc_getter_version()
+
+            handlers.append(module_hook(hook_callback, with_kwargs=True))
+
+        return HandlerList(handlers)
 
 
     def _intervention_setter(
@@ -1603,7 +1607,7 @@ class IntervenableModel(BaseModel):
                         self.hot_activations[
                             self._intervention_reverse_link[key]
                         ] = intervened_representation.clone()
-                    
+
                     if isinstance(output, tuple):
                         _ = self._scatter_intervention_output(
                             output[0], intervened_representation, key, unit_locations_base[key_i]
@@ -1615,6 +1619,9 @@ class IntervenableModel(BaseModel):
                             
                     self._intervention_state[key].inc_setter_version()
 
+            # ex : register_forward_pre_hook
+            # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
+            # with_kwargs : If true, the hook will be passed the kwargs given to forward
             handlers.append(module_hook(hook_callback, with_kwargs=True))
 
         return HandlerList(handlers)
@@ -1722,6 +1729,7 @@ class IntervenableModel(BaseModel):
                     )
                     # for setters, we don't remove them.
                     all_set_handlers.extend(set_handlers)
+
         return all_set_handlers
 
 
@@ -1902,7 +1910,7 @@ class IntervenableModel(BaseModel):
             base_outputs = self.model(**base)
 
         try:
-            # intervene
+            # intervene using hooks
             if self.mode == "parallel":
                 set_handlers_to_remove = (
                     self._wait_for_forward_with_parallel_intervention(
@@ -1929,6 +1937,8 @@ class IntervenableModel(BaseModel):
             if 'use_cache' in self.model.config.to_dict(): # for transformer models
                 model_kwargs["use_cache"] = use_cache
 
+            # ex : hook in register_forward_pre_hook called every time before forward() is invoked
+            # https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.register_forward_pre_hook
             counterfactual_outputs = self.model(**base, **model_kwargs)
 
             set_handlers_to_remove.remove()
