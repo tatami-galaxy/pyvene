@@ -151,9 +151,8 @@ class BaseModel(nn.Module):
                 self.return_collect_activations = True
 
             # determine what kind of hooks are needed
-            # CONST_INPUT_HOOK = "register_forward_pre_hook"
-            # CONST_OUTPUT_HOOK = "register_forward_hook"
-            # CONST_GRAD_HOOK = "register_hook"
+            # determine model component to intervene with hook
+            # get_module_hook in modeling_utils.py
             module_hook = get_module_hook(
                 model, representation, backend
             )
