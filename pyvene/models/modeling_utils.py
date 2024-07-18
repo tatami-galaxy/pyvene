@@ -132,6 +132,10 @@ def get_dimension_by_component(model_type, model_config, component) -> int:
 def get_module_hook(model, representation, backend="native") -> nn.Module:
     """Render the intervening module with a hook."""
     if (
+        # get_internal_model_type just returns type(model)
+        # get type of model
+        # get exact name of representation of huggingface model and type of hook
+        # from type_to_module_mapping in that model file
         get_internal_model_type(model) in type_to_module_mapping and
         representation.component
         in type_to_module_mapping[get_internal_model_type(model)]
@@ -143,6 +147,7 @@ def get_module_hook(model, representation, backend="native") -> nn.Module:
         hook_type = type_info[1]
         if "%s" in parameter_name and representation.moe_key is None:
             # we assume it is for the layer.
+            # replace %s with layer num, ex : 'mlp.h[%s]' -> 'mlp.h[0]'
             parameter_name = parameter_name % (representation.layer)
         elif "%s" in parameter_name and representation.moe_key is not None:
             parameter_name = parameter_name % (

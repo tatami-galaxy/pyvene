@@ -110,6 +110,7 @@ class BaseModel(nn.Module):
         ):
             _key = self._get_representation_key(representation)
 
+            # get intervention type
             if representation.intervention is not None:
                 intervention = representation.intervention
                 intervention.use_fast = self.use_fast
@@ -128,9 +129,8 @@ class BaseModel(nn.Module):
                     component_dim *= int(representation.max_number_of_units)
                 all_metadata["embed_dim"] = component_dim
                 all_metadata["use_fast"] = self.use_fast
-                intervention = intervention_function(
-                    **all_metadata
-                )
+                # initialize intervention class
+                intervention = intervention_function(**all_metadata)
                 
             if representation.intervention_link_key in self._intervention_pointers:
                 self._intervention_reverse_link[
@@ -156,6 +156,7 @@ class BaseModel(nn.Module):
             # determine what kind of hooks are needed
             # determine model component to intervene with hook
             # get_module_hook in modeling_utils.py
+            # hook is determined by model component
             module_hook = get_module_hook(
                 model, representation, backend
             )

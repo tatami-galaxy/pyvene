@@ -7,7 +7,6 @@ from collections import defaultdict
 import networkx as nx
 import matplotlib.pyplot as plt
 
-
 class CausalModel:
     def __init__(
         self,
@@ -62,7 +61,8 @@ class CausalModel:
             for output in self.outputs:
                 self.timesteps[output] = self.end_time
         self.variables.sort(key=lambda x: self.timesteps[x])
-        self.run_forward()
+        # tests forward_run
+        #self.run_forward()
         self.pos = pos
         width = {_: 0 for _ in range(len(self.variables))}
         if self.pos == None:
@@ -181,9 +181,7 @@ class CausalModel:
                 if intervention is not None and variable in intervention:
                     total_setting[variable] = intervention[variable]
                 else:
-                    total_setting[variable] = self.functions[variable](
-                        *[total_setting[parent] for parent in self.parents[variable]]
-                    )
+                    total_setting[variable] = self.functions[variable](*[total_setting[parent] for parent in self.parents[variable]])
             length = len(list(total_setting.keys()))
         return total_setting
 
