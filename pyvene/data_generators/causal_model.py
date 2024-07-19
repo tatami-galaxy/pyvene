@@ -48,12 +48,15 @@ class CausalModel:
             if len(self.parents) == 0:
                 self.start_variables.append(variable)
 
+        # leaf nodes
         self.inputs = [var for var in self.variables if len(parents[var]) == 0]
+        # get root (output)
         self.outputs = copy.deepcopy(variables)
         for child in variables:
             for parent in parents[child]:
                 if parent in self.outputs:
                     self.outputs.remove(parent)
+
         if self.timesteps is not None:
             self.timesteps = timesteps
         else:
@@ -77,11 +80,20 @@ class CausalModel:
         else:
             self.equiv_classes = {}
     
+
+    # self.equiv classes is a dict with one entry for each variable.
+    # For each variable there is a dict where keys are all possible values of the variable
+    # and values of the inner dict are empty lists initially. To each list we add dicts containing
+    # parent variables and their possible value combinations (arrows towards root).
+    # That is for each value of each non leaf node, we store all possible incoming value combinations
+    # from the parents (arrows towards root).
     def generate_equiv_classes(self):
         for var in self.variables:
+            # only consider each non leaf var once
             if var in self.inputs or var in self.equiv_classes:
                 continue
             self.equiv_classes[var] = {val: [] for val in self.values[var]}
+            # cartesian product since we want all possible parent value combinations
             for parent_values in itertools.product(
                 *[self.values[par] for par in self.parents[var]]
             ):
@@ -89,6 +101,7 @@ class CausalModel:
                 self.equiv_classes[var][value].append(
                     {par: parent_values[i] for i, par in enumerate(self.parents[var])}
                 )
+
 
     def generate_timesteps(self):
         timesteps = {input: 0 for input in self.inputs}
@@ -109,8 +122,10 @@ class CausalModel:
         # return all timesteps and timestep of root
         return timesteps, step - 2
 
+
     def marginalize(self, target):
         pass
+
 
     def print_structure(self, pos=None, font=12, node_size=1000):
         G = nx.DiGraph()
@@ -124,6 +139,7 @@ class CausalModel:
         plt.figure(figsize=(10, 10))
         nx.draw_networkx(G, with_labels=True, node_color="green", pos=self.pos, font_size=font, node_size=node_size)
         plt.show()
+
 
     def find_live_paths(self, intervention):
         actual_setting = self.run_forward(intervention)
@@ -147,6 +163,7 @@ class CausalModel:
             step += 1
         del paths[1]
         return paths
+
 
     def print_setting(self, total_setting, font=12, node_size=1000):
         relabeler = {
@@ -186,6 +203,7 @@ class CausalModel:
             length = len(list(total_setting.keys()))
         return total_setting
 
+
     # example :
     # base = {"W": reps[0], "X": reps[0], "Y": reps[1], "Z": reps[3]}
     # source = {"W": reps[0], "X": reps[1], "Y": reps[2], "Z": reps[2]}
@@ -213,15 +231,19 @@ class CausalModel:
         self.values[variable] = values
         self.functions[variable] = function
 
+
     def sample_intervention(self, mandatory=None):
         intervention = {}
         while len(intervention.keys()) == 0:
+            # only consider non leaf and non root nodes
             for var in self.variables:
                 if var in self.inputs or var in self.outputs:
                     continue
                 if random.choice([0, 1]) == 0:
+                    # values gives all possible values of a variable
                     intervention[var] = random.choice(self.values[var])
         return intervention
+
 
     def sample_input(self, mandatory=None):
         input = {var: random.sample(self.values[var], 1)[0] for var in self.inputs}
@@ -231,15 +253,22 @@ class CausalModel:
             total = self.run_forward(intervention=input)
         return input
 
+
+    # this will generate balanced samples since an output is first chosen at random
+    # and one of the possible input settings is derived recursively, top down
     def sample_input_tree_balanced(self, output_var=None, output_var_value=None):
         assert output_var is not None or len(self.outputs) == 1
+
+        # returns if all variables already in self.equiv_classes
+        # this is done the first time generate_equiv_classes is called for the instance
         self.generate_equiv_classes()
 
         if output_var is None:
+            # select output variable
             output_var = self.outputs[0]
         if output_var_value is None:
+            # randomly select an output value
             output_var_value = random.choice(self.values[output_var])
-
 
         def create_input(var, value, input={}):
             parent_values = random.choice(self.equiv_classes[var][value])
@@ -250,11 +279,14 @@ class CausalModel:
                     create_input(parent, parent_values[parent], input)
             return input
 
+        # find an input (leaf variables) setting which produces the output_var_value randomly chosen
         input_setting = create_input(output_var, output_var_value)
         for input_var in self.inputs:
             if input_var not in input_setting:
+                # that means we can choose any value for this input_var
                 input_setting[input_var] = random.choice(self.values[input_var])
         return input_setting
+
 
     def get_path_maxlen_filter(self, lengths):
         def check_path(total_setting):
@@ -276,6 +308,7 @@ class CausalModel:
 
         return compare
 
+
     def get_specific_path_filter(self, start, end):
         def check_path(total_setting):
             input = {var: total_setting[var] for var in self.inputs}
@@ -288,6 +321,7 @@ class CausalModel:
 
         return check_path
 
+
     def input_to_tensor(self, setting):
         result = []
         for input in self.inputs:
@@ -297,6 +331,7 @@ class CausalModel:
             result.append(temp)
         return torch.cat(result)
 
+
     def output_to_tensor(self, setting):
         result = []
         for output in self.outputs:
@@ -305,6 +340,7 @@ class CausalModel:
                 temp = torch.reshape(temp, (1,))
             result.append(temp)
         return torch.cat(result)
+
 
     def generate_factual_dataset(
         self,
@@ -327,8 +363,10 @@ class CausalModel:
         examples = []
         while len(examples) < size:
             example = dict()
+            # get an input setting
             input = sampler()
             if filter is None or filter(input):
+                # output for all variables
                 output = self.run_forward(input)
                 if return_tensors:
                     example['input_ids'] = input_function(input).to(device)
@@ -339,6 +377,7 @@ class CausalModel:
                 examples.append(example)
 
         return examples
+
 
     def generate_counterfactual_dataset(
         self,
@@ -369,6 +408,7 @@ class CausalModel:
             sampler = self.sample_input
         if intervention_sampler is None:
             intervention_sampler = self.sample_intervention
+
         examples = []
         while len(examples) < size:
             intervention = intervention_sampler()

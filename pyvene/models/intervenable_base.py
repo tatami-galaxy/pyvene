@@ -1911,6 +1911,7 @@ class IntervenableModel(BaseModel):
         if sources is None and activations_sources is None \
             and unit_locations is None and len(self.interventions) == 0:
             return self.model(**base), None
+        
         # broadcast
         unit_locations = self._broadcast_unit_locations(get_batch_size(base), unit_locations)
         sources = [None]*len(self._intervention_group) if sources is None else sources
@@ -1929,6 +1930,7 @@ class IntervenableModel(BaseModel):
         base_outputs = None
         if output_original_output:
             # returning un-intervened output with gradients
+            # False by default
             base_outputs = self.model(**base)
 
         try:
