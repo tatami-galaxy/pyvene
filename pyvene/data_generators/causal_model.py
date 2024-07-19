@@ -169,6 +169,7 @@ class CausalModel:
         nx.draw_networkx(G, with_labels=True, node_color="green", pos=newpos, font_size=font, node_size=node_size)
         plt.show()
 
+
     def run_forward(self, intervention=None):
         total_setting = defaultdict(None)
         length = len(list(total_setting.keys()))
@@ -185,12 +186,17 @@ class CausalModel:
             length = len(list(total_setting.keys()))
         return total_setting
 
+    # example :
+    # base = {"W": reps[0], "X": reps[0], "Y": reps[1], "Z": reps[3]}
+    # source = {"W": reps[0], "X": reps[1], "Y": reps[2], "Z": reps[2]}
+    # setting = equality_model.run_interchange(base, {"WX": source})
     def run_interchange(self, input, source_interventions):
         interchange_intervention = copy.deepcopy(input)
         for var in source_interventions:
             setting = self.run_forward(source_interventions[var])
             interchange_intervention[var] = setting[var]
         return self.run_forward(interchange_intervention)
+
 
     def add_variable(
         self, variable, values, parents, children, function, timestep=None
