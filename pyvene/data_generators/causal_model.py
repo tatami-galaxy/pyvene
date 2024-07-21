@@ -208,6 +208,10 @@ class CausalModel:
     # base = {"W": reps[0], "X": reps[0], "Y": reps[1], "Z": reps[3]}
     # source = {"W": reps[0], "X": reps[1], "Y": reps[2], "Z": reps[2]}
     # setting = equality_model.run_interchange(base, {"WX": source})
+
+    # For each intervened variable run forward with source input
+    # to get setting for all nodes. Change base input intervention variable(s) with setting.
+    # Run forward to get intervened output
     def run_interchange(self, input, source_interventions):
         interchange_intervention = copy.deepcopy(input)
         for var in source_interventions:
@@ -239,8 +243,10 @@ class CausalModel:
             for var in self.variables:
                 if var in self.inputs or var in self.outputs:
                     continue
+                # either select or ignore an intermediate variable
                 if random.choice([0, 1]) == 0:
-                    # values gives all possible values of a variable
+                    # values -> possible values of a variable
+                    # if selected, randomly select a value for the intermediate variable
                     intervention[var] = random.choice(self.values[var])
         return intervention
 
@@ -254,13 +260,15 @@ class CausalModel:
         return input
 
 
-    # this will generate balanced samples since an output is first chosen at random
-    # and one of the possible input settings is derived recursively, top down
+    # This will generate balanced samples since an output is first chosen at random
+    # and one of the possible input settings is derived recursively, top down.
+    # If output_var and out_var_value is given, this will generate an input setting
+    # to match the output variable. output_var can be an intermediate variable
     def sample_input_tree_balanced(self, output_var=None, output_var_value=None):
         assert output_var is not None or len(self.outputs) == 1
 
-        # returns if all variables already in self.equiv_classes
-        # this is done the first time generate_equiv_classes is called for the instance
+        # returns immidiately if all variables already in self.equiv_classes
+        # this is computed the first time generate_equiv_classes() is called for the instance
         self.generate_equiv_classes()
 
         if output_var is None:
@@ -379,6 +387,8 @@ class CausalModel:
         return examples
 
 
+    # sample intervened intermediate variables and their values
+    # sample input to match intervened variables and their values
     def generate_counterfactual_dataset(
         self,
         size,
@@ -397,6 +407,7 @@ class CausalModel:
         if output_function is None:
             output_function = self.output_to_tensor
 
+        # all non leaf non output variables
         maxlength = len(
             [
                 var
@@ -411,23 +422,30 @@ class CausalModel:
 
         examples = []
         while len(examples) < size:
+            # dict with intermediate (non leaf) variable(s) and its (their) (intervened) value
             intervention = intervention_sampler()
             if filter is None or filter(intervention):
+                # same intervention for each batch
                 for _ in range(batch_size):
                     example = dict()
+                    # sample base input
                     base = sampler()
                     sources = []
+                    # intervened_var : source input tensor
                     source_dic = {}
                     for var in self.variables:
                         if var not in intervention:
                             continue
-                        # sample input to match sampled intervention value
+                        # sample input to match sampled intervention value for each intervened variable
+                        # to get source input
                         source = sampler(output_var=var, output_var_value=intervention[var])
                         if return_tensors:
                             sources.append(self.input_to_tensor(source))
                         else:
                             sources.append(source)
                         source_dic[var] = source
+
+                    # pad sources to maxlength
                     for _ in range(maxlength - len(sources)):
                         if return_tensors:
                             sources.append(torch.zeros(self.input_to_tensor(base).shape))

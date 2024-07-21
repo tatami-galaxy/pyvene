@@ -272,7 +272,9 @@ class RotatedSpaceIntervention(TrainableIntervention, DistributedRepresentationI
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # rotation matrix -> orthogonal by default
         rotate_layer = RotateLayer(self.embed_dim)
+        # apply an orthogonal or unitary parametrization to a matrix or a batch of matrices
         self.rotate_layer = torch.nn.utils.parametrizations.orthogonal(rotate_layer)
 
     def forward(self, base, source, subspaces=None):

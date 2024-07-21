@@ -25,6 +25,7 @@ class RotateLayer(torch.nn.Module):
         # starting point already.
         # you can also study this if you want, but it is our focus.
         if init_orth:
+            # fill the input Tensor with a (semi) orthogonal matrix
             torch.nn.init.orthogonal_(weight)
         self.weight = torch.nn.Parameter(weight, requires_grad=True)
 

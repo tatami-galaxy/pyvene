@@ -794,6 +794,7 @@ class IntervenableNdifModel(BaseModel):
             if isinstance(intervention, SkipIntervention):
                 raise NotImplementedError("Skip intervention is not implemented for ndif backend")
             else:
+                # gather intervening activations from the output based on unit_locations
                 selected_output = self._gather_intervention_output(
                     output, key, unit_locations[key_i]
                 )
@@ -1701,13 +1702,18 @@ class IntervenableModel(BaseModel):
 
         # for each source, we hook in getters to cache activations
         # at each aligning representations
-        if activations_sources is None:
+        if activations_sources is None: 
             assert len(sources) == len(self._intervention_group)
+            # _intervention_group is set during base model init with config
+            # example :
+            # OrderedDict({0: ['layer.0.comp.block_output.unit.pos.nunit.1#0'],
+            # 1: ['layer.0.comp.block_output.unit.pos.nunit.1#1']})
             for group_id, keys in self._intervention_group.items():
                 if sources[group_id] is None:
                     continue  # smart jump for advance usage only
                 group_get_handlers = HandlerList([])
                 for key in keys:
+                    # store source values for intervened variables
                     get_handlers = self._intervention_getter(
                         [key],
                         [
@@ -1717,7 +1723,10 @@ class IntervenableModel(BaseModel):
                         ],
                     )
                     group_get_handlers.extend(get_handlers)
+                    # model forward with sources
                 _ = self.model(**sources[group_id])
+                # handler will store outputs with hook_callback
+                # remove handler
                 group_get_handlers.remove()
         else:
             # simply patch in the ones passed in
@@ -1725,14 +1734,14 @@ class IntervenableModel(BaseModel):
             for _, passed_in_key in enumerate(self.activations):
                 assert passed_in_key in self.sorted_keys
         
-        # in parallel mode, we swap cached activations all into
-        # base at once
+        # in parallel mode, we swap cached activations all into base at once
         for group_id, keys in self._intervention_group.items():
             for key in keys:
                 # skip in case smart jump
                 if key in self.activations or \
                     isinstance(self.interventions[key][0], types.FunctionType) or \
                     self.interventions[key][0].is_source_constant:
+                    # intervene on base input with source values already stored
                     set_handlers = self._intervention_setter(
                         [key],
                         [
@@ -1913,6 +1922,7 @@ class IntervenableModel(BaseModel):
             return self.model(**base), None
         
         # broadcast
+        # what does this do?
         unit_locations = self._broadcast_unit_locations(get_batch_size(base), unit_locations)
         sources = [None]*len(self._intervention_group) if sources is None else sources
         sources = self._broadcast_sources(sources)
