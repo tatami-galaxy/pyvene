@@ -1591,6 +1591,7 @@ class IntervenableModel(BaseModel):
                     # no-op to the output
                     
                 else:
+                    # False for DAS main example
                     if not isinstance(self.interventions[key][0], types.FunctionType):
                         if intervention.is_source_constant:
                             intervened_representation = do_intervention(
