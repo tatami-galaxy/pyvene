@@ -66,6 +66,9 @@ class CausalModel:
         self.variables.sort(key=lambda x: self.timesteps[x])
         # tests forward_run
         #self.run_forward()
+
+        # node positions in graph
+        # a dictionary with nodes as keys and positions as values
         self.pos = pos
         width = {_: 0 for _ in range(len(self.variables))}
         if self.pos == None:
