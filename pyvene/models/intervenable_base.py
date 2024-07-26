@@ -17,7 +17,8 @@ from .interventions import (
     TrainableIntervention,
     SkipIntervention,
     CollectIntervention,
-    BoundlessRotatedSpaceIntervention
+    BoundlessRotatedSpaceIntervention,
+    InterventionOutput
 )
 
 from torch import optim
@@ -56,6 +57,7 @@ class BaseModel(nn.Module):
         self.is_model_stateless = is_stateless(model)
         self.config.model_type = str(type(model)) # backfill
         self.use_fast = kwargs["use_fast"] if "use_fast" in kwargs else False
+        self.as_adaptor = kwargs["as_adaptor"] if "as_adaptor" in kwargs else False
 
         self.model_has_grad = False
         if self.use_fast:
@@ -228,6 +230,8 @@ class BaseModel(nn.Module):
         # cached swapped activations (hot)
         self.hot_activations = {}
 
+        self.aux_loss = []
+        
         # temp fields should not be accessed outside
         self._batched_setter_activation_select = {}
         """
@@ -1553,7 +1557,8 @@ class IntervenableModel(BaseModel):
                 ]  # batch_size
 
             def hook_callback(model, args, kwargs, output=None):
-                if self._is_generation:
+                # if it is None, we use it as adaptor.
+                if unit_locations_base[key_i] is not None and self._is_generation:
                     is_prompt = self._key_setter_call_counter[key] == 0
                     if not self._intervene_on_prompt or is_prompt:
                         self._key_setter_call_counter[key] += 1
@@ -1600,6 +1605,10 @@ class IntervenableModel(BaseModel):
                                 intervention,
                                 subspaces[key_i] if subspaces is not None else None,
                             )
+                            if isinstance(intervened_representation, InterventionOutput):
+                                if intervened_representation.loss is not None:
+                                    self.aux_loss.append(intervened_representation.loss)
+                                intervened_representation = intervened_representation.output
                         else:
                             intervened_representation = do_intervention(
                                 selected_output,
@@ -1843,7 +1852,7 @@ class IntervenableModel(BaseModel):
         labels: Optional[torch.LongTensor] = None,
         output_original_output: Optional[bool] = False,
         return_dict: Optional[bool] = None,
-        use_cache: Optional[bool] = True,
+        use_cache: Optional[bool] = None,
     ):
         """
         Main forward function that serves a wrapper to
@@ -1914,7 +1923,9 @@ class IntervenableModel(BaseModel):
         activations_sources = source_representations
         if sources is not None and not isinstance(sources, list):
             sources = [sources]
-        
+
+        self.aux_loss.clear()
+
         self._cleanup_states()
 
         # if no source input or intervention, we return base
