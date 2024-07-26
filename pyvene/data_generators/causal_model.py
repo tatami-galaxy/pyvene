@@ -346,7 +346,10 @@ class CausalModel:
     def output_to_tensor(self, setting):
         result = []
         for output in self.outputs:
-            temp = torch.tensor(float(setting[output]))
+            if len(setting[output]) > 1:
+                temp = torch.tensor(setting[output].astype(float))
+            else:
+                temp = torch.tensor(float(setting[output]))
             if len(temp.size()) == 0:
                 temp = torch.reshape(temp, (1,))
             result.append(temp)
