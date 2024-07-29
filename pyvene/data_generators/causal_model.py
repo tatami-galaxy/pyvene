@@ -1,7 +1,7 @@
 import random
 import copy
-import inspect
 import itertools
+import numpy as np
 import torch
 from collections import defaultdict
 import networkx as nx
@@ -95,13 +95,18 @@ class CausalModel:
             # only consider each non leaf var once
             if var in self.inputs or var in self.equiv_classes:
                 continue
-            self.equiv_classes[var] = {val: [] for val in self.values[var]}
+            #self.equiv_classes[var] = {val: [] for val in self.values[var]}
+            # val has to be hashable
+            self.equiv_classes[var] = {tuple(val) if isinstance(val, np.ndarray) else val: [] for val in self.values[var]}
+
             # cartesian product since we want all possible parent value combinations
             for parent_values in itertools.product(
                 *[self.values[par] for par in self.parents[var]]
             ):
                 value = self.functions[var](*parent_values)
-                self.equiv_classes[var][value].append(
+                #self.equiv_classes[var][value].append(
+                # value has to be hashable
+                self.equiv_classes[var][tuple(value) if isinstance(value, np.ndarray) else value].append(
                     {par: parent_values[i] for i, par in enumerate(self.parents[var])}
                 )
 
@@ -282,6 +287,11 @@ class CausalModel:
             output_var_value = random.choice(self.values[output_var])
 
         def create_input(var, value, input={}):
+
+            # value needs to be hashable
+            if isinstance(value, np.ndarray):
+                value = tuple(value)
+
             parent_values = random.choice(self.equiv_classes[var][value])
             for parent in parent_values:
                 if parent in self.inputs:
@@ -346,10 +356,12 @@ class CausalModel:
     def output_to_tensor(self, setting):
         result = []
         for output in self.outputs:
-            if len(setting[output]) > 1:
-                temp = torch.tensor(setting[output].astype(float))
-            else:
-                temp = torch.tensor(float(setting[output]))
+            # if we want vector outputs
+            #if len(setting[output]) > 1:
+                #temp = torch.tensor(setting[output].astype(float))
+            #else:
+                #temp = torch.tensor(float(setting[output]))
+            temp = torch.tensor(float(setting[output]))  # only works for scalar output
             if len(temp.size()) == 0:
                 temp = torch.reshape(temp, (1,))
             result.append(temp)
