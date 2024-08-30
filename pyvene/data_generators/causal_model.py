@@ -320,6 +320,7 @@ class CausalModel:
 
         return check_path
 
+
     def get_partial_filter(self, partial_setting):
         def compare(total_setting):
             for var in partial_setting:
