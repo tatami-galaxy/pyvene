@@ -91,10 +91,10 @@ def _do_intervention_by_swap(
     base,
     source,
     mode="interchange",
-    interchange_dim=None,
-    subspaces=None,
+    interchange_dim=None,       # ex: 768
+    subspaces=None,             # ex: [[10,11,12]]
     subspace_partition=None,
-    use_fast=False,
+    use_fast=False,             # ex: True
 ):
     """The basic do function that guards interventions"""
     if mode == "collect":
@@ -150,6 +150,7 @@ def _do_intervention_by_swap(
     if sel_subspace_indices is not None:
         pad_idx = torch.arange(base.shape[-2]).unsqueeze(dim=-1).to(base.device)
         if mode == "interchange":
+            # replace base subspace dim values with source subspace dim values
             base[..., pad_idx, sel_subspace_indices] = source[..., pad_idx, sel_subspace_indices]
         elif mode == "add":
             base[..., pad_idx, sel_subspace_indices] += source[..., pad_idx, sel_subspace_indices]

@@ -532,6 +532,7 @@ class BaseModel(nn.Module):
         """
         Scatter in the intervened activations in the output
         """
+
         # data structure casting
         if isinstance(output, tuple):
             original_output = output[0]
@@ -1439,7 +1440,8 @@ class IntervenableModel(BaseModel):
             return None
 
         cached_activations = self.activations[key]
-        if self.is_model_stateless:
+        # True for gpt
+        if self.is_model_stateless: 
             # nothing to reconcile if stateless
             return cached_activations
 
@@ -1548,9 +1550,9 @@ class IntervenableModel(BaseModel):
 
     def _intervention_setter(
         self,
-        keys,
-        unit_locations_base,
-        subspaces,
+        keys,                   # rep name
+        unit_locations_base,    # ex: 3rd token
+        subspaces,              # ex: 10,11,12
     ) -> HandlerList:
         """
         Create a list of setter handlers that will set activations
@@ -1605,7 +1607,6 @@ class IntervenableModel(BaseModel):
                     # no-op to the output
                     
                 else:
-                    # False for DAS main example
                     if not isinstance(self.interventions[key][0], types.FunctionType):
                         if intervention.is_source_constant:
                             raw_intervened_representation = do_intervention(
@@ -1622,7 +1623,8 @@ class IntervenableModel(BaseModel):
                         else:
                             intervened_representation = do_intervention(
                                 selected_output,
-                                self._reconcile_stateful_cached_activations(
+                                # get activation for token position
+                                self._reconcile_stateful_cached_activations(    
                                     key,
                                     selected_output,
                                     unit_locations_base[key_i],
@@ -1651,6 +1653,7 @@ class IntervenableModel(BaseModel):
                             self._intervention_reverse_link[key]
                         ] = intervened_representation.clone()
 
+                    # output changed in place
                     if isinstance(output, tuple):
                         _ = self._scatter_intervention_output(
                             output[0], intervened_representation, key, unit_locations_base[key_i]
@@ -1659,7 +1662,7 @@ class IntervenableModel(BaseModel):
                         _ = self._scatter_intervention_output(
                             output, intervened_representation, key, unit_locations_base[key_i]
                         )
-                            
+
                     self._intervention_state[key].inc_setter_version()
 
             # ex : register_forward_pre_hook
@@ -1762,6 +1765,7 @@ class IntervenableModel(BaseModel):
                     isinstance(self.interventions[key][0], types.FunctionType) or \
                     self.interventions[key][0].is_source_constant:
                     # intervene on base input with source values already stored
+                    # hooks
                     set_handlers = self._intervention_setter(
                         [key],
                         [
@@ -1945,7 +1949,9 @@ class IntervenableModel(BaseModel):
         
         # broadcast
         # what does this do?
+        # ex : {'base': 3} -> {'sources->base': (None, [[[3]]])}
         unit_locations = self._broadcast_unit_locations(get_batch_size(base), unit_locations)
+
         sources = [None]*len(self._intervention_group) if sources is None else sources
         sources = self._broadcast_sources(sources)
         activations_sources = self._broadcast_source_representations(activations_sources)
@@ -1972,7 +1978,7 @@ class IntervenableModel(BaseModel):
                     self._wait_for_forward_with_parallel_intervention(
                         sources,
                         unit_locations,
-                        activations_sources,
+                        activations_sources, # source reps
                         subspaces,
                     )
                 )

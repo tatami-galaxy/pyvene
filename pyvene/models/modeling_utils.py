@@ -315,10 +315,10 @@ def gather_neurons(tensor_input, unit, unit_locations_as_list, device=None):
 
 
 def scatter_neurons(
-    tensor_input,
-    replacing_tensor_input,
-    component,
-    unit,
+    tensor_input,               # original_output
+    replacing_tensor_input,     # intervened_representation
+    component,                  # ex: mlp_output
+    unit,                       # ex: pos
     unit_locations_as_list,
     model_type,
     model_config,
@@ -454,6 +454,7 @@ def do_intervention(
 
     # flatten
     original_base_shape = base_representation.shape
+
     if len(original_base_shape) == 2 or (
         isinstance(intervention, LocalistRepresentationIntervention)
     ) or intervention.keep_last_dim:
