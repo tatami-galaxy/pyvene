@@ -220,6 +220,7 @@ class CausalModel:
     # For each intervened variable run forward with source input
     # to get setting for all nodes. Change base input intervention variable(s) with setting.
     # Run forward to get intervened output
+    # input = base, source_intervention = source_dic
     def run_interchange(self, input, source_interventions):
         interchange_intervention = copy.deepcopy(input)
         for var in source_interventions:
@@ -271,7 +272,8 @@ class CausalModel:
     # This will generate balanced samples since an output is first chosen at random
     # and one of the possible input settings is derived recursively, top down.
     # If output_var and out_var_value is given, this will generate an input setting
-    # to match the output variable. output_var can be an intermediate variable
+    # to match the output variable.
+    # output_var can be an intermediate variable
     def sample_input_tree_balanced(self, output_var=None, output_var_value=None):
         assert output_var is not None or len(self.outputs) == 1
 
@@ -441,7 +443,10 @@ class CausalModel:
 
         examples = []
         while len(examples) < size:
-            # dict with intermediate (non leaf) variable(s) and its (their) (intervened) value
+            # dict with intermediate (non leaf) variable(s) and its (their) (intervened) value(s)
+            # Ex: sample_intervention:
+            # randomly select intermediate variables to intervene, then randomly select
+            # possible values from their range
             intervention = intervention_sampler()
             if filter is None or filter(intervention):
                 # same intervention for each batch
@@ -457,6 +462,12 @@ class CausalModel:
                             continue
                         # sample input to match sampled intervention value for each intervened variable
                         # to get source input
+                        # Ex: sample_input_tree_balanced:
+                        # This will generate balanced samples since an output is first chosen at random
+                        # and one of the possible input settings is derived recursively, top down.
+                        # If output_var and out_var_value is given, this will generate an input setting
+                        # to match the output variable.
+                        # output_var can be an intermediate variable
                         source = sampler(output_var=var, output_var_value=intervention[var])
                         if return_tensors:
                             sources.append(self.input_to_tensor(source))

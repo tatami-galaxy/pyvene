@@ -510,6 +510,7 @@ class BaseModel(nn.Module):
             )
 
             # gather based on intervention locations
+            # get component (ex: attn_head) specific output
             selected_output = gather_neurons(
                 original_output,
                 self.representations[
@@ -1524,6 +1525,8 @@ class IntervenableModel(BaseModel):
                     # WARNING: might be worth to check the below assertion at runtime,
                     # but commenting it out for now just to avoid confusion.
                     # assert key not in self.activations
+                    # True for gpt
+                    # save source activation for location
                     self.activations[key] = selected_output
                 else:
                     state_select_flag = []
@@ -1582,7 +1585,8 @@ class IntervenableModel(BaseModel):
                         output = kwargs[list(kwargs.keys())[0]]
                     else:
                         output = args
-                        
+                
+                # gather base activation for location
                 selected_output = self._gather_intervention_output(
                     output, key, unit_locations_base[key_i]
                 )
@@ -1622,8 +1626,9 @@ class IntervenableModel(BaseModel):
                                 intervened_representation = raw_intervened_representation
                         else:
                             intervened_representation = do_intervention(
+                                # base activation
                                 selected_output,
-                                # get activation for token position
+                                # get cached source activation for token position
                                 self._reconcile_stateful_cached_activations(    
                                     key,
                                     selected_output,
@@ -1764,8 +1769,8 @@ class IntervenableModel(BaseModel):
                 if key in self.activations or \
                     isinstance(self.interventions[key][0], types.FunctionType) or \
                     self.interventions[key][0].is_source_constant:
-                    # intervene on base input with source values already stored
-                    # hooks
+                    # set intervention on base input with source values already stored
+                    # hook will be called on the model.forward with base in IntervenableModel.forward
                     set_handlers = self._intervention_setter(
                         [key],
                         [
@@ -1782,7 +1787,7 @@ class IntervenableModel(BaseModel):
                         if subspaces is not None
                         else None,
                     )
-                    # for setters, we don't remove them.
+                    # for setters, we don't remove them because they will be used later
                     all_set_handlers.extend(set_handlers)
 
         return all_set_handlers
@@ -1993,6 +1998,7 @@ class IntervenableModel(BaseModel):
                 )
 
             # run intervened forward
+            # hooks already created to swap base activations with source activations
             model_kwargs = {}
             if labels is not None: # for training
                 model_kwargs["labels"] = labels
