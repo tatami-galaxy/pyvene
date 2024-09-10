@@ -215,10 +215,10 @@ class CausalModel:
     # example :
     # base = {"W": reps[0], "X": reps[0], "Y": reps[1], "Z": reps[3]}
     # source = {"W": reps[0], "X": reps[1], "Y": reps[2], "Z": reps[2]}
-    # setting = equality_model.run_interchange(base, {"WX": source})
+    # setting = equality_model.`run_interchang`e(base, {"WX": source})
 
-    # For each intervened variable run forward with source input
-    # to get setting for all nodes. Change base input intervention variable(s) with setting.
+    # For each intervened variable run forward with source input to get setting for all nodes. 
+    # Change base input intervention variable(s) from this source setting.
     # Run forward to get intervened output
     # input = base, source_intervention = source_dic
     def run_interchange(self, input, source_interventions):
