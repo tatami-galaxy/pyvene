@@ -247,6 +247,7 @@ class CausalModel:
 
     def sample_intervention(self, mandatory=None):
         intervention = {}
+        # while condition prevents 'no intervention' samples
         while len(intervention.keys()) == 0:
             # only consider non leaf and non root nodes
             for var in self.variables:
@@ -469,6 +470,7 @@ class CausalModel:
                         # to match the output variable.
                         # output_var can be an intermediate variable
                         source = sampler(output_var=var, output_var_value=intervention[var])
+
                         if return_tensors:
                             sources.append(self.input_to_tensor(source))
                         else:
