@@ -299,6 +299,7 @@ def gather_neurons(tensor_input, unit, unit_locations_as_list, device=None):
         tensor_output = bs_hd_to_bhsd(pos_tensor_output, d)
 
         return tensor_output  # b, num_unit (h), num_unit (pos), d
+    
     else:
         unit_locations = torch.tensor(
             unit_locations_as_list, device=tensor_input.device if device is None else device
@@ -311,6 +312,7 @@ def gather_neurons(tensor_input, unit, unit_locations_as_list, device=None):
                 *unit_locations.shape, *(1,) * (len(tensor_input.shape) - 2)
             ).expand(-1, -1, *tensor_input.shape[2:]),
         )
+
         return tensor_output
 
 
