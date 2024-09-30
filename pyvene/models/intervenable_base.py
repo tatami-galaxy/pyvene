@@ -554,20 +554,21 @@ class BaseModel(nn.Module):
         unit = self.representations[
             representations_key
         ].unit
-     
+
         # scatter in-place
+        # ex :
         _ = scatter_neurons(
-            original_output,
-            intervened_representation,
-            component,
-            unit,
-            unit_locations,
+            original_output,            # torch.Size([8, 300, 768])
+            intervened_representation,  # torch.Size([8, 1, 768])
+            component,                  # block_output
+            unit,                       # pos
+            unit_locations,             # [[3], [3], [3], [3], [3], [3], [3], [3]]
             self.model_type,
             self.model_config,
             self.use_fast,
             device=self.get_device()
         )
-        
+
         return original_output
     
 
@@ -1440,7 +1441,9 @@ class IntervenableModel(BaseModel):
         if key not in self.activations:
             return None
 
+        # single position if chosen by token position
         cached_activations = self.activations[key]
+
         # True for gpt
         if self.is_model_stateless: 
             # nothing to reconcile if stateless
@@ -1477,7 +1480,7 @@ class IntervenableModel(BaseModel):
         # for non-intervening ones, we copy again from base
         reconciled_activations = torch.stack(reconciled_activations, dim=0)  # batched
         # reconciled_activations[~state_select_flag] = intervening_activations[~state_select_flag]
-
+        
         return reconciled_activations
     
 
@@ -1527,6 +1530,7 @@ class IntervenableModel(BaseModel):
                     # assert key not in self.activations
                     # True for gpt
                     # save source activation for location
+                    # single position if chosen by position
                     self.activations[key] = selected_output
                 else:
                     state_select_flag = []
@@ -1658,6 +1662,7 @@ class IntervenableModel(BaseModel):
                             self._intervention_reverse_link[key]
                         ] = intervened_representation.clone()
 
+                    print('scatter')
                     # output changed in place
                     if isinstance(output, tuple):
                         _ = self._scatter_intervention_output(
@@ -1751,7 +1756,9 @@ class IntervenableModel(BaseModel):
                         ],
                     )
                     group_get_handlers.extend(get_handlers)
-                    # model forward with sources
+
+                # model forward with sources
+                print('sources')
                 _ = self.model(**sources[group_id])
                 # handler will store outputs with hook_callback
                 # remove handler
@@ -1974,6 +1981,9 @@ class IntervenableModel(BaseModel):
         if output_original_output:
             # returning un-intervened output with gradients
             # False by default
+            print('un-intervened')
+            base_outputs = self.model(**base)
+            print('un-intervened')
             base_outputs = self.model(**base)
 
         try:
@@ -2004,9 +2014,9 @@ class IntervenableModel(BaseModel):
                 model_kwargs["labels"] = labels
             if use_cache is not None and 'use_cache' in self.model.config.to_dict(): # for transformer models
                 model_kwargs["use_cache"] = use_cache
-
             # ex : hook in register_forward_pre_hook called every time before forward() is invoked
             # https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.register_forward_pre_hook
+            print('intervened')
             counterfactual_outputs = self.model(**base, **model_kwargs)
 
             set_handlers_to_remove.remove()

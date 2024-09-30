@@ -266,6 +266,7 @@ def gather_neurons(tensor_input, unit, unit_locations_as_list, device=None):
     in tensor_input, according to the unit.
     :return the gathered tensor as tensor_output
     """
+
     if unit in {"t"}:
         return tensor_input
 
