@@ -1662,7 +1662,6 @@ class IntervenableModel(BaseModel):
                             self._intervention_reverse_link[key]
                         ] = intervened_representation.clone()
 
-                    print('scatter')
                     # output changed in place
                     if isinstance(output, tuple):
                         _ = self._scatter_intervention_output(
@@ -1758,7 +1757,6 @@ class IntervenableModel(BaseModel):
                     group_get_handlers.extend(get_handlers)
 
                 # model forward with sources
-                print('sources')
                 _ = self.model(**sources[group_id])
                 # handler will store outputs with hook_callback
                 # remove handler
@@ -1980,10 +1978,6 @@ class IntervenableModel(BaseModel):
         base_outputs = None
         if output_original_output:
             # returning un-intervened output with gradients
-            # False by default
-            print('un-intervened')
-            base_outputs = self.model(**base)
-            print('un-intervened')
             base_outputs = self.model(**base)
 
         try:
@@ -2016,7 +2010,7 @@ class IntervenableModel(BaseModel):
                 model_kwargs["use_cache"] = use_cache
             # ex : hook in register_forward_pre_hook called every time before forward() is invoked
             # https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.register_forward_pre_hook
-            print('intervened')
+
             counterfactual_outputs = self.model(**base, **model_kwargs)
 
             set_handlers_to_remove.remove()
